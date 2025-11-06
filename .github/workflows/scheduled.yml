@@ -106,14 +106,32 @@ jobs:
           fi
           scripts/parse_regions.sh
 
-      - name: Commit and push data updates (if any)
+      - name: Generate schedule images from JSON (all regions / GPV groups)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[INFO] Preparing to render images from data/*.json"
+          # Ensure Playwright is available (safe to re-run)
+          npm i --no-save playwright
+          npx --yes playwright install --with-deps chromium
+
+          # Respect REGION env if provided (limits to a single region)
+          if [ -n "${REGION:-}" ]; then
+            echo "[INFO] Rendering images only for region='${REGION}'"
+            node scripts/batch_render.mjs --region "${REGION}"
+          else
+            echo "[INFO] Rendering images for all regions"
+            node scripts/batch_render.mjs
+          fi
+
+      - name: Commit and push data/images updates (if any)
         if: github.ref_name == env.TARGET_BRANCH
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo "[INFO] Preparing to commit changes in data/ to ${TARGET_BRANCH}"
+          echo "[INFO] Preparing to commit changes in data/ and images/ to ${TARGET_BRANCH}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -122,16 +140,17 @@ jobs:
           # Ensure we are on the target branch
           git checkout "$TARGET_BRANCH"
 
-          # Show current status under data/
-          echo "[INFO] Changed files under data/ (working tree):"
-          git status --porcelain data/ || true
+          # Show current status under data/ and images/
+          echo "[INFO] Changed files under data/ and images/ (working tree):"
+          git status --porcelain data/ images/ || true
 
-          # Stage only JSON files in data/
+          # Stage JSON files and any rendered images
           git add data/*.json 2>/dev/null || true
+          git add images/** 2>/dev/null || true
 
           # If nothing staged, skip
-          if git diff --cached --quiet -- data/; then
-            echo "[INFO] No changes detected under data/ — skipping commit"
+          if git diff --cached --quiet; then
+            echo "[INFO] No changes detected under data/ or images/ — skipping commit"
             exit 0
           fi
 
@@ -142,13 +161,13 @@ jobs:
           git pull --rebase origin "$TARGET_BRANCH" || true
 
           msg_region=${REGION:-all}
-          commit_msg="data: update schedules (region=${msg_region}) — run #${GITHUB_RUN_ID}"
+          commit_msg="data/images: update schedules and rendered images (region=${msg_region}) — run #${GITHUB_RUN_ID}"
           git commit -m "$commit_msg"
 
           # Retry push up to 3 times on race
           for attempt in 1 2 3; do
             if git push origin HEAD:"$TARGET_BRANCH"; then
-              echo "[OK] Pushed data updates to $TARGET_BRANCH"
+              echo "[OK] Pushed data/images updates to $TARGET_BRANCH"
               exit 0
             fi
             echo "[WARN] Push failed (attempt $attempt). Rebasing and retrying..."

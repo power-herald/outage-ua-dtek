@@ -3,3 +3,6 @@
 
 # Local environment (do not commit secrets)
 .env
+/node_modules/
+/package.json
+/package-lock.json
