@@ -9,7 +9,7 @@
  * Notes:
  * - The script is defensive: it never overwrites the output with invalid/empty data.
  * - It attempts JSON.parse first; if that fails (JS literal), it falls back to a safe eval via Function().
- * - Output schema is defined by data/_template.json. Meta is minimal per requirements.
+ * - Output schema is defined by templates/json/data.json. Meta is minimal per requirements.
  */
 
 const fs = require('fs');
@@ -106,7 +106,7 @@ function loadExisting(file) {
 function loadTemplateBase(regionId) {
   let template = null;
   try {
-    const tplPath = path.join(__dirname, '..', 'data', '_template.json');
+    const tplPath = path.join(__dirname, '..', 'templates', 'json', 'data.json');
     template = JSON.parse(fs.readFileSync(tplPath, 'utf8'));
   } catch (_) {
     // Fallback minimal template if _template.json is unavailable

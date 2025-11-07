@@ -32,18 +32,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Ensure jq is available
-        shell: bash
-        run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y jq
-          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Ensure Playwright Chromium is installed
+        run: npx --yes playwright install --with-deps chromium
 
       - name: Fetch HTML for each region (with Playwright fallback)
         shell: bash
@@ -60,14 +66,7 @@ jobs:
 
           mkdir -p outputs
 
-          # Setup Node and Playwright (Chromium)
-          if ! command -v node >/dev/null 2>&1; then
-            echo "[INFO] Node.js not found in PATH, installing via setup-node is recommended earlier in the job" >&2
-          fi
-          echo "[INFO] Installing Playwright npm package"
-          npm i --no-save playwright
-          echo "[INFO] Installing Playwright Chromium runtime"
-          npx --yes playwright install --with-deps chromium
+          # Playwright and Chromium are installed once above (with caching). Using cached toolchain.
 
           # If REGION is set — pass it to the script; otherwise fetch all
           if [ -n "${REGION:-}" ]; then
@@ -81,39 +80,20 @@ jobs:
           # Always exit 0 to not fail the pipeline on partial fetch issues
           exit 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Make parse scripts executable (safety)
-        shell: bash
-        run: |
-          chmod +x scripts/parse_regions.sh || true
-          chmod +x scripts/fetch_regions.sh || true
-
       - name: Parse DisconSchedule.fact into JSON per region (skip failures)
         shell: bash
         run: |
-          set -e
-          # If REGION is set, ensure only its HTML exists to parse; otherwise parse all outputs/*.html
-          if [ -n "${REGION:-}" ]; then
-            for f in outputs/*.html; do
-              base=$(basename "$f")
-              reg=${base%.html}
-              if [ "$reg" != "$REGION" ]; then rm -f "$f"; fi
-            done
-          fi
-          scripts/parse_regions.sh
+          set -euo pipefail
+          echo "[INFO] Parsing outputs/*.html into data/*.json via Node batch parser"
+          # Respect REGION env if provided (limits to a single region)
+          node scripts/batch_parse.mjs
 
       - name: Generate schedule images from JSON (all regions / GPV groups)
         shell: bash
         run: |
           set -euo pipefail
           echo "[INFO] Preparing to render images from data/*.json"
-          # Ensure Playwright is available (safe to re-run)
-          npm i --no-save playwright
-          npx --yes playwright install --with-deps chromium
+          # Playwright toolchain prepared earlier (cached); no reinstall needed here.
 
           # Respect REGION env if provided (limits to a single region)
           if [ -n "${REGION:-}" ]; then

@@ -1,7 +1,7 @@
 // Render PNG image of the schedule that visually matches our HTML design template
 // Usage examples:
 //   node scripts/render_png.mjs --json data/kyiv-region.json --gpv GPV1.2 --out images/kyiv-region/gpv-1-2.png
-//   node scripts/render_png.mjs --json data/odesa.json --gpv GPV3.1 --html scripts/full-template.html --out images/odesa/gpv-3-1.png
+//   node scripts/render_png.mjs --json data/odesa.json --gpv GPV3.1 --html templates/html/full-template.html --out images/odesa/gpv-3-1.png
 //   node scripts/render_png.mjs --theme dark --scale 2            # optional dark theme and higher DPR
 //   node scripts/render_png.mjs --max                             # render at maximum quality (DPR=4 unless --scale provided)
 //
@@ -10,7 +10,7 @@
 //   Playwright Chromium installed: npx playwright install --with-deps chromium
 //
 // Notes:
-// - Uses scripts/full-template.html by default. Data is injected into the page (window.__SCHEDULE__).
+// - Uses templates/html/full-template.html by default. Data is injected into the page (window.__SCHEDULE__).
 // - Also sets window.__GPV_KEY__ so the template can render the requested GPV group.
 // - The screenshot is taken from the .container element to match the exact UI area without extra browser margins.
 
@@ -43,7 +43,7 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv);
 const projectRoot = process.cwd();
 
-const htmlPath = path.resolve(args.html || 'scripts/full-template.html');
+const htmlPath = path.resolve(args.html || 'templates/html/full-template.html');
 const jsonPath = path.resolve(args.json || 'data/kyiv-region.json');
 const outPath = path.resolve(args.out || 'images/kyiv-region/gpv-1-2.png');
 const gpvKey = args.gpv || null; // e.g., GPV1.2

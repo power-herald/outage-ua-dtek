@@ -35,7 +35,7 @@ const onlyRegion = args.region || null; // regionId or file stem
 
 const dataDir = path.join(projectRoot, 'data');
 const imagesDir = path.join(projectRoot, 'images');
-const templateHtml = path.join(projectRoot, 'scripts', 'full-template.html');
+const templateHtml = path.join(projectRoot, 'templates', 'html', 'full-template.html');
 const rendererScript = path.join(projectRoot, 'scripts', 'render_png.mjs');
 
 function normalizeRegionId(json, fileStem) {
@@ -59,18 +59,18 @@ async function fileExists(p) {
 async function runRenderer({ jsonPath, gpvKey, outPath }) {
   await mkdir(path.dirname(outPath), { recursive: true });
   return new Promise((resolve) => {
-    const args = [rendererScript, '--html', templateHtml, '--json', jsonPath, '--gpv', gpvKey, '--out', outPath];
-    if (theme === 'dark') { args.push('--theme', 'dark'); }
+    const childArgs = [rendererScript, '--html', templateHtml, '--json', jsonPath, '--gpv', gpvKey, '--out', outPath];
+    if (theme === 'dark') { childArgs.push('--theme', 'dark'); }
     if (Number.isFinite(scale) && scale > 0) {
-      args.push('--scale', String(scale));
+      childArgs.push('--scale', String(scale));
     } else {
-      // No explicit scale provided for batch — allow explicit max-quality passthrough
+      // No explicit scale provided for batch — allow explicit max-quality passthrough from outer CLI
       if (args.max === true || String(args.quality || '').toLowerCase() === 'max') {
-        args.push('--max');
+        childArgs.push('--max');
       }
     }
 
-    const child = spawn(process.execPath, args, { stdio: 'inherit' });
+    const child = spawn(process.execPath, childArgs, { stdio: 'inherit' });
     child.on('exit', (code) => {
       resolve({ code });
     });
