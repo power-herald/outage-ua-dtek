@@ -35,7 +35,9 @@ const onlyRegion = args.region || null; // regionId or file stem
 
 const dataDir = path.join(projectRoot, 'data');
 const imagesDir = path.join(projectRoot, 'images');
-const templateHtml = path.join(projectRoot, 'templates', 'html', 'full-template.html');
+const templateFull = path.join(projectRoot, 'templates', 'html', 'full-template.html');
+const templateEmergency = path.join(projectRoot, 'templates', 'html', 'emergency-template.html');
+const templateWeek = path.join(projectRoot, 'templates', 'html', 'week-template.html');
 const rendererScript = path.join(projectRoot, 'scripts', 'render_png.mjs');
 
 function normalizeRegionId(json, fileStem) {
@@ -56,10 +58,10 @@ async function fileExists(p) {
   try { await stat(p); return true; } catch { return false; }
 }
 
-async function runRenderer({ jsonPath, gpvKey, outPath }) {
+async function runRenderer({ htmlTemplate, jsonPath, gpvKey, outPath }) {
   await mkdir(path.dirname(outPath), { recursive: true });
   return new Promise((resolve) => {
-    const childArgs = [rendererScript, '--html', templateHtml, '--json', jsonPath, '--gpv', gpvKey, '--out', outPath];
+    const childArgs = [rendererScript, '--html', htmlTemplate, '--json', jsonPath, '--gpv', gpvKey, '--out', outPath];
     if (theme === 'dark') { childArgs.push('--theme', 'dark'); }
     if (Number.isFinite(scale) && scale > 0) {
       childArgs.push('--scale', String(scale));
@@ -78,14 +80,20 @@ async function runRenderer({ jsonPath, gpvKey, outPath }) {
 }
 
 (async () => {
-  if (!(await fileExists(templateHtml))) {
-    console.error(`[ERROR] HTML template not found: ${templateHtml}`);
-    process.exit(1);
+  // Verify templates and renderer exist
+  let missing = false;
+  for (const [name, p] of [['full', templateFull], ['emergency', templateEmergency], ['week', templateWeek]]) {
+    if (!(await fileExists(p))) {
+      console.error(`[ERROR] HTML template not found (${name}): ${p}`);
+      missing = true;
+    }
   }
   if (!(await fileExists(rendererScript))) {
     console.error(`[ERROR] Renderer script not found: ${rendererScript}`);
-    process.exit(1);
+    missing = true;
   }
+  if (missing) process.exit(1);
+
   await mkdir(imagesDir, { recursive: true });
 
   const entries = await readdir(dataDir, { withFileTypes: true });
@@ -97,6 +105,9 @@ async function runRenderer({ jsonPath, gpvKey, outPath }) {
 
   let total = 0, ok = 0, failed = 0;
 
+  const toEmergencyName = (base) => base.replace(/\.png$/i, '-emergency.png');
+  const toWeekName = (base) => base.replace(/\.png$/i, '-week.png');
+
   for (const jf of jsonFiles) {
     const fileStem = path.basename(jf, '.json');
     try {
@@ -107,15 +118,15 @@ async function runRenderer({ jsonPath, gpvKey, outPath }) {
         continue;
       }
       const regionId = normalizeRegionId(json, fileStem);
-      if (onlyRegion && onlyRegion !== regionId && onlyRegion !== fileStem) {
+      if (onlyRegion && (onlyRegion !== regionId && onlyRegion !== fileStem)) {
         continue; // filtered out
       }
 
       const presetData = json?.preset?.data || {};
       const gpvKeys = Object.keys(presetData).filter(k => /^GPV\d+\.\d+$/i.test(k)).sort((a, b) => {
         // sort by numeric major/minor
-        const pa = a.match(/\d+|\./g)?.join('') || '';
-        const pb = b.match(/\d+|\./g)?.join('') || '';
+        const pa = a.match(/\d+|\.|/g)?.join('') || '';
+        const pb = b.match(/\d+|\.|/g)?.join('') || '';
         return pa.localeCompare(pb, 'en', { numeric: true });
       });
       if (gpvKeys.length === 0) {
@@ -124,12 +135,35 @@ async function runRenderer({ jsonPath, gpvKey, outPath }) {
       }
 
       for (const gpv of gpvKeys) {
-        total++;
         const outDir = path.join(imagesDir, regionId);
-        const outPath = path.join(outDir, gpvToFileName(gpv));
-        console.log(`[INFO] Rendering region='${regionId}' group='${gpv}' -> ${path.relative(projectRoot, outPath)}`);
-        const { code } = await runRenderer({ jsonPath: jf, gpvKey: gpv, outPath });
-        if (code === 0) ok++; else failed++;
+        const baseName = gpvToFileName(gpv);
+
+        // 1) Full template (combined) -> gpv-x-x.png
+        {
+          total++;
+          const outPath = path.join(outDir, baseName);
+          console.log(`[INFO] Rendering FULL region='${regionId}' group='${gpv}' -> ${path.relative(projectRoot, outPath)}`);
+          const { code } = await runRenderer({ htmlTemplate: templateFull, jsonPath: jf, gpvKey: gpv, outPath });
+          if (code === 0) ok++; else failed++;
+        }
+
+        // 2) Emergency (today/tomorrow) -> gpv-x-x-emergency.png
+        {
+          total++;
+          const outPath = path.join(outDir, toEmergencyName(baseName));
+          console.log(`[INFO] Rendering EMERGENCY region='${regionId}' group='${gpv}' -> ${path.relative(projectRoot, outPath)}`);
+          const { code } = await runRenderer({ htmlTemplate: templateEmergency, jsonPath: jf, gpvKey: gpv, outPath });
+          if (code === 0) ok++; else failed++;
+        }
+
+        // 3) Week (full weekly matrix) -> gpv-x-x-week.png
+        {
+          total++;
+          const outPath = path.join(outDir, toWeekName(baseName));
+          console.log(`[INFO] Rendering WEEK region='${regionId}' group='${gpv}' -> ${path.relative(projectRoot, outPath)}`);
+          const { code } = await runRenderer({ htmlTemplate: templateWeek, jsonPath: jf, gpvKey: gpv, outPath });
+          if (code === 0) ok++; else failed++;
+        }
       }
     } catch (e) {
       console.warn(`[WARN] Failed to process ${jf}: ${e?.message || e}`);

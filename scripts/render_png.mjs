@@ -142,9 +142,18 @@ async function startStaticServer(rootDir) {
   try {
     await page.goto(urlToOpen, { waitUntil: 'networkidle', timeout: Math.max(timeoutMs, 10000) });
 
-    // Wait for both tables to build
-    await page.waitForSelector('#matrix tbody tr:last-child td:last-child', { timeout: timeoutMs });
-    await page.waitForSelector('#today tbody tr td:last-child', { timeout: timeoutMs });
+    // Wait for content depending on template: some templates may only have #today or only #matrix
+    const hasMatrix = await page.$('#matrix');
+    const hasToday = await page.$('#today');
+    if (hasMatrix) {
+      await page.waitForSelector('#matrix tbody tr:last-child td:last-child', { timeout: timeoutMs });
+    }
+    if (hasToday) {
+      await page.waitForSelector('#today tbody tr td:last-child', { timeout: timeoutMs });
+    }
+    if (!hasMatrix && !hasToday) {
+      throw new Error('Template did not render #matrix nor #today');
+    }
 
     const container = page.locator('.container');
     // Compute expected size for logging

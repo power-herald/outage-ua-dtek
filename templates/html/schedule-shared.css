@@ -1,0 +1,133 @@
+/* Shared schedule styles (canonical). Source: full-template.html */
+:root {
+  --bg: #f6f8fb;
+  --panel: #ffffff;
+  --text: #0e1624;
+  --muted: #6b7785;
+  --hash: rgba(14, 22, 36, 0.08);
+  --grid: #e2e8f0;
+  --grid-strong: #cbd5e1;
+  --accent: #0b6bcb;
+  --head: #f1f5f9;
+  --maybe-bg: rgba(15, 23, 42, 0.12);
+  /* Warm yellow accents for highlighting today's row in weekly matrix */
+  --today-border: #f2b200; /* warm amber/yellow for borders */
+  --today-bg: #fff4cc;    /* light warm yellow background for day header */
+}
+
+/* Optional dark theme override (URL: ?theme=dark) */
+.theme-dark {
+  --bg: #0b0d12;
+  --panel: #121621;
+  --text: #e8ecf1;
+  --muted: #9aa7b2;
+  --hash: rgba(231, 234, 239, 0.16);
+  --grid: #2a3242;
+  --grid-strong: #3a4458;
+  --accent: #5bbcff;
+  --head: #0f1522;
+  --maybe-bg: rgba(160,170,180,0.7);
+  --today-border: #f2b200;
+  --today-bg: #3a2a00;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+.container { display: inline-block; margin: 0 auto; padding: 24px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 16px; letter-spacing: 0.2px; display: flex; align-items: center; gap: 10px; }
+/* Right-aligned yellow group badge shown next to the first title */
+.group-badge {
+  margin-left: auto;
+  background: #ffd666; /* warm yellow */
+  color: #000; /* black text as requested */
+  border-radius: 17px;
+  padding: 0 15px;
+  height: 35px;
+  line-height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 400;
+  border: 1px solid #e3b617; /* subtle outline for contrast on both themes */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.02) inset;
+}
+.panel { background: var(--panel); width: 835px; }
+.table-wrap { overflow: auto; margin-bottom: 24px; border-radius: 10px; }
+table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+th, td { border-right: 1px solid var(--grid); border-bottom: 1px solid var(--grid); padding: 0; text-align: center; white-space: nowrap; font-size: 12px; }
+thead th { background: var(--head); color: var(--text); position: sticky; top: 0; z-index: 2; }
+thead th:first-child { left: 0; z-index: 3; position: sticky; text-align: left; white-space: normal; }
+tbody th { position: sticky; left: 0; z-index: 1; background: linear-gradient(90deg, var(--head), var(--panel)); text-align: left; padding: 0 10px }
+thead th, tbody th { font-weight: 600; }
+thead th:first-child, tbody th { border-left: 1px solid var(--grid-strong); }
+thead th:last-child, tbody td:last-child { border-right: 1px solid var(--grid-strong); }
+tbody tr:last-child td, tbody tr:last-child th { border-bottom: 1px solid var(--grid-strong); }
+thead tr:first-child th { border-top: 1px solid var(--grid-strong); }
+thead th:first-child { border-top-left-radius: 10px; padding: 0 10px; }
+thead th:last-child { border-top-right-radius: 10px; }
+tbody tr:last-child th { border-bottom-left-radius: 10px; }
+tbody tr:last-child td:last-child { border-bottom-right-radius: 10px; }
+.muted { color: var(--muted); font-weight: 100; font-size: 10px; }
+.hash { color: var(--hash); font-weight: 100; font-size: 10px; }
+
+/* Rotate header time labels (first row, starting from the second cell) */
+thead th:not(:first-child) > .vlabel {
+  writing-mode: vertical-rl;      /* vertical text */
+  text-orientation: mixed;        /* keep digits readable */
+  letter-spacing: 0.3px;
+  padding: 10px 6px;              /* a bit narrower since vertical */
+  display: inline-block;
+  vertical-align: bottom;         /* align baseline nicely */
+}
+
+/* Matrix sizing rules */
+*, *::before, *::after { box-sizing: border-box; }
+tbody td {
+  width: 30px;
+  height: 38px;
+  padding: 0;
+}
+thead th {
+  height: 55px;
+  min-width: 30px;
+}
+tbody th {
+  height: 38px;
+  max-width: 105px;
+  min-width: 70px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Cell state coloring */
+tbody td.state-yes { background: white; }
+tbody td.state-no { background: var(--maybe-bg); }
+tbody td.state-maybe { background: var(--maybe-bg); }
+tbody td.state-mfirst, tbody td.state-first { background: linear-gradient(90deg, var(--maybe-bg) 0 50%, white 50% 100%); }
+tbody td.state-msecond, tbody td.state-second { background: linear-gradient(90deg, white 0 50%, var(--maybe-bg) 50% 100%); }
+
+/* Center icons inside cells and fix their size */
+tbody td { text-align: center; }
+tbody td .cell-icon { width: 20px; height: 20px; display: inline-block; margin-top: 3px; }
+
+/* Weekly matrix: highlight today's row */
+#matrix tbody tr.is-today { border-top-color: var(--today-border) !important;}
+#matrix tbody tr.is-today th,
+#matrix tbody tr.is-today td { border-top-color: var(--today-border) !important; border-bottom-color: var(--today-border) !important; }
+#matrix tbody tr.is-today > th { background: var(--today-bg) !important; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; margin: 12px 0 0; }
+.legend-item { display: inline-flex; align-items: center; font-size: 10px; }
+.legend-box { width: 30px; height: 38px; border: 1px solid var(--grid); box-sizing: border-box; margin-right: 8px; display: flex; align-items: center; justify-content: center; }
+.legend-box .cell-icon { width: 20px; height: 20px; display: block; }
+/* Use same coloring as matrix states */
+.legend-box.state-yes { background: white; }
+.legend-box.state-no { background: var(--maybe-bg); }
+.legend-box.state-maybe { background: var(--maybe-bg); }
+.legend-box.state-mfirst { background: linear-gradient(90deg, var(--maybe-bg) 0 50%, white 50% 100%); }
+.legend-box.state-msecond { background: linear-gradient(90deg, white 0 50%, var(--maybe-bg) 50% 100%); }
