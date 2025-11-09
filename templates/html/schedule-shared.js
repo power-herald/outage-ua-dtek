@@ -45,6 +45,106 @@
     return stateIconSrc(state);
   }
 
+  // ===== Helpers for mapping update timestamps to time slot columns =====
+  function parseTimeLabelStartMinutes(label) {
+    if (!label) return NaN;
+    const s = String(label).trim();
+    let m = s.match(/^([0-9]{1,2}):([0-9]{2})$/);
+    if (m) {
+      const hh = Math.min(24, Math.max(0, Number(m[1])));
+      const mm = Math.min(59, Math.max(0, Number(m[2])));
+      return (hh * 60) + mm;
+    }
+    m = s.match(/^([0-9]{1,2})\s*-\s*([0-9]{1,2})$/);
+    if (m) {
+      const hh = Math.min(24, Math.max(0, Number(m[1])));
+      return hh * 60;
+    }
+    m = s.match(/^([0-9]{1,2})$/);
+    if (m) {
+      const hh = Math.min(24, Math.max(0, Number(m[1])));
+      return hh * 60;
+    }
+    return NaN;
+  }
+
+  function buildStartsMinutesFromPreset(preset) {
+    const tzKeys = Object.keys(preset?.time_zone || {}).map(Number).sort((a,b)=>a-b);
+    const labels = tzKeys.map(k => preset.time_zone[String(k)]?.[0] || '');
+    const starts = labels.map(parseTimeLabelStartMinutes);
+    return { tzKeys, starts };
+  }
+
+  function parseUpdateToMinutes(str) {
+    if (!str || typeof str !== 'string') return NaN;
+    // Expected like "DD.MM.YYYY HH:mm" or "DD.MM HH:mm" (rare). We only need time of day.
+    const m = str.match(/(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s+(\d{1,2}):(\d{2})/);
+    if (!m) return NaN;
+    const hh = Math.min(24, Math.max(0, Number(m[4])));
+    const mi = Math.min(59, Math.max(0, Number(m[5])));
+    return hh * 60 + mi;
+  }
+
+  // Parse "DD.MM[.YYYY] HH:mm" and return comparable tuple { y, m, d, hh, mi }
+  function parseUpdateToParts(str) {
+    if (!str || typeof str !== 'string') return null;
+    const m = str.trim().match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s+(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const dd = Math.min(31, Math.max(1, Number(m[1])));
+    const mm = Math.min(12, Math.max(1, Number(m[2])));
+    let yyyy = m[3] ? Number(m[3]) : NaN;
+    if (!Number.isFinite(yyyy)) {
+      try {
+        // Current year in Europe/Kyiv
+        const now = new Date();
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric' }).formatToParts(now);
+        yyyy = Number(parts.find(p => p.type === 'year')?.value) || now.getFullYear();
+      } catch (_) { yyyy = new Date().getFullYear(); }
+    }
+    const hh = Math.min(23, Math.max(0, Number(m[4])));
+    const mi = Math.min(59, Math.max(0, Number(m[5])));
+    return { y: yyyy, m: mm, d: dd, hh, mi };
+  }
+
+  function compareUpdateParts(a, b) {
+    if (!a && !b) return 0; if (!a) return -1; if (!b) return 1;
+    if (a.y !== b.y) return a.y - b.y;
+    if (a.m !== b.m) return a.m - b.m;
+    if (a.d !== b.d) return a.d - b.d;
+    if (a.hh !== b.hh) return a.hh - b.hh;
+    return a.mi - b.mi;
+  }
+
+  function mapMinutesToIndex(starts, mins) {
+    if (!Array.isArray(starts) || !Number.isFinite(mins)) return -1;
+    if (starts.length === 0) return -1;
+    // Find the last start <= mins
+    let idx = 0;
+    for (let i = 0; i < starts.length; i++) {
+      if (!Number.isFinite(starts[i])) continue;
+      if (starts[i] <= mins) idx = i;
+    }
+    return idx;
+  }
+
+  function highlightColumn(tableId, colIdx, className) {
+    if (!Number.isFinite(colIdx) || colIdx < 0) return;
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const theadRow = table.querySelector('thead tr');
+    if (theadRow) {
+      const ths = theadRow.querySelectorAll('th');
+      const th = ths[1 + colIdx]; // +1 due to row header corner cell
+      if (th) th.classList.add(className);
+    }
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      const td = tds[colIdx];
+      if (td) td.classList.add(className);
+    });
+  }
+
   async function loadData() {
     if (window.__SCHEDULE__) return window.__SCHEDULE__;
     let regionId = 'kyiv-region';
@@ -64,26 +164,27 @@
   }
 
   function formatLastUpdated(data) {
-    let updatedLabel = '';
-    if (data.lastUpdated) {
-      try {
-        const d = new Date(data.lastUpdated);
-        const parts = new Intl.DateTimeFormat('uk-UA', {
-          timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
-        }).formatToParts(d);
-        const get = t => parts.find(p => p.type === t)?.value || '';
-        const dd = get('day');
-        const mm = get('month');
-        const yyyy = get('year');
-        const hh = get('hour');
-        const min = get('minute');
-        updatedLabel = `${dd}.${mm}.${yyyy} ${hh}:${min}`;
-      } catch (_) {}
+    // Choose timestamp for "last updated" from either preset.updateFact or fact.update (or preset.update fallback).
+    // If both exist, pick the later one by date/time (Europe/Kyiv). Otherwise return whichever is present.
+    const factUpd = (data?.fact?.update || '').trim();
+    const presetUpd = (data?.preset?.updateFact || data?.preset?.update || '').trim();
+    const hasFact = !!factUpd;
+    const hasPreset = !!presetUpd;
+    if (hasFact && hasPreset) {
+      const a = parseUpdateToParts(factUpd);
+      const b = parseUpdateToParts(presetUpd);
+      if (a && b) {
+        // compareUpdateParts returns negative if a < b
+        return compareUpdateParts(a, b) >= 0 ? factUpd : presetUpd;
+      }
+      // If parsing failed for one of them, return the one that parses, else prefer fact
+      if (a && !b) return factUpd;
+      if (!a && b) return presetUpd;
+      return factUpd; // both unparsed: prefer fact by convention
     }
-    if (!updatedLabel && data.fact && data.fact.update) {
-      updatedLabel = data.fact.update;
-    }
-    return updatedLabel;
+    if (hasFact) return factUpd;
+    if (hasPreset) return presetUpd;
+    return '';
   }
 
   function injectLastUpdatedIfPresent(data) {
@@ -218,6 +319,9 @@
 
     table.appendChild(thead);
     table.appendChild(tbody);
+
+    // Return tzKeys for highlighting
+    return { tzKeys, times };
   }
 
   function buildToday(preset, fact, gpvKey) {
@@ -302,6 +406,9 @@
 
     table.appendChild(thead);
     table.appendChild(tbody);
+
+    // Return tzKeys for highlighting
+    return { tzKeys };
   }
 
   function extractGroupNumber(gpvKey, names) {
@@ -467,6 +574,25 @@
     if (badge) {
       const num = extractGroupNumber(gpvKey, preset?.sch_names || {});
       if (num) badge.textContent = num;
+    }
+  }
+
+  function applyUpdateHighlights(preset, data) {
+    const { tzKeys, starts } = buildStartsMinutesFromPreset(preset);
+    if (!tzKeys || !tzKeys.length) return;
+    const factMins = parseUpdateToMinutes(data?.fact?.update || data?.fact?.updateFact || '');
+    const presetMins = parseUpdateToMinutes(data?.preset?.updateFact || data?.preset?.update || '');
+    const factIdx = Number.isFinite(factMins) ? mapMinutesToIndex(starts, factMins) : -1;
+    const presetIdx = Number.isFinite(presetMins) ? mapMinutesToIndex(starts, presetMins) : -1;
+    // Apply to today table (if exists)
+    if (document.getElementById('today')) {
+      if (factIdx >= 0) highlightColumn('today', factIdx, 'col-update');
+      if (presetIdx >= 0) highlightColumn('today', presetIdx, 'col-update');
+    }
+    // Apply to weekly matrix (if exists)
+    if (document.getElementById('matrix')) {
+      if (factIdx >= 0) highlightColumn('matrix', factIdx, 'col-update');
+      if (presetIdx >= 0) highlightColumn('matrix', presetIdx, 'col-update');
     }
   }
 
