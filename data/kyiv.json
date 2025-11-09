@@ -1,6 +1,6 @@
 {
   "regionId": "kyiv",
-  "lastUpdated": "2025-11-09T12:28:33.144Z",
+  "lastUpdated": "2025-11-09T13:12:14.663Z",
   "fact": {
     "data": {
       "1762639200": {
@@ -79,8 +79,8 @@
           "20": "yes",
           "21": "yes",
           "22": "yes",
-          "23": "yes",
-          "24": "yes"
+          "23": "no",
+          "24": "no"
         },
         "GPV2.2": {
           "1": "yes",
@@ -150,10 +150,10 @@
           "13": "yes",
           "14": "yes",
           "15": "yes",
-          "16": "yes",
-          "17": "yes",
-          "18": "yes",
-          "19": "yes",
+          "16": "no",
+          "17": "no",
+          "18": "no",
+          "19": "no",
           "20": "yes",
           "21": "yes",
           "22": "yes",
@@ -283,11 +283,11 @@
           "16": "yes",
           "17": "yes",
           "18": "yes",
-          "19": "yes",
-          "20": "yes",
-          "21": "yes",
-          "22": "yes",
-          "23": "yes",
+          "19": "second",
+          "20": "no",
+          "21": "no",
+          "22": "no",
+          "23": "first",
           "24": "yes"
         },
         "GPV6.2": {
@@ -632,7 +632,7 @@
         }
       }
     },
-    "update": "09.11.2025 12:30",
+    "update": "09.11.2025 14:48",
     "today": 1762639200
   },
   "preset": {
@@ -3009,18 +3009,18 @@
         }
       }
     },
-    "updateFact": "09.11.2025 12:30"
+    "updateFact": "09.11.2025 14:48"
   },
   "lastUpdateStatus": {
     "status": "error",
     "ok": false,
     "code": 422,
     "message": "Marker `DisconSchedule.fact =` not found in /home/runner/work/outage-data-ua/outage-data-ua/outputs/kyiv.html",
-    "at": "2025-11-09T12:48:24.599Z",
-    "attempt": 281
+    "at": "2025-11-09T13:25:48.436Z",
+    "attempt": 283
   },
   "meta": {
     "schemaVersion": "1.0.0",
-    "contentHash": "4b90e0d5b26069ef88feca9291c5ef6dff921e18947e466afc39c8e1d19be09f"
+    "contentHash": "244d4640fe4ba9f33f6d334339de044b57fa82e493f582fb5d73b4750f9107d7"
   }
 }
