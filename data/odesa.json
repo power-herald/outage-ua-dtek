@@ -1,6 +1,7 @@
 {
   "regionId": "odesa",
-  "lastUpdated": "2025-11-09T18:40:23.466Z",
+  "regionAffiliation": "Одеса та обл.",
+  "lastUpdated": "2025-11-09T19:36:16.220Z",
   "fact": {
     "data": {
       "1762639200": {
@@ -3034,8 +3035,8 @@
     "ok": false,
     "code": 422,
     "message": "Marker `DisconSchedule.fact =` not found in /home/runner/work/outage-data-ua/outage-data-ua/outputs/odesa.html",
-    "at": "2025-11-09T18:50:36.177Z",
-    "attempt": 304
+    "at": "2025-11-09T19:49:12.393Z",
+    "attempt": 308
   },
   "meta": {
     "schemaVersion": "1.0.0",
