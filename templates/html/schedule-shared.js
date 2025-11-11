@@ -477,7 +477,8 @@
         const timeLabel = preset.time_zone[String(hk)]?.[0] || '';
         const desc = raw ? (preset.time_type?.[raw] || raw) : '';
         if (desc) td.title = (names[gpvKey] || gpvKey) + ' ' + timeLabel + ' — ' + desc;
-        const iconSrc = raw ? stateIconSrc(raw) : null;
+        // For groups template, use the 'nfirst/nsecond' icons like in the Today table
+        const iconSrc = raw ? stateIconSrcToday(raw) : null;
         if (iconSrc) {
           const img = document.createElement('img');
           img.className = 'cell-icon';
