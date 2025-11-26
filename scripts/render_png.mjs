@@ -41,7 +41,7 @@ if (!Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0) {
   if (args.max === true || String(args.quality || '').toLowerCase() === 'max') {
     deviceScaleFactor = 4; // maximum crispness, larger files
   } else {
-    deviceScaleFactor = 1; // default to 1x (keeps images under 1000px width for Telegram)
+    deviceScaleFactor = 1.5; // default to 1.5x (better quality, still reasonable size for Telegram)
   }
 }
 // Cap to a reasonable upper bound to avoid extreme memory usage in CI
