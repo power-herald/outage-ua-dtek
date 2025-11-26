@@ -4,3 +4,4 @@
 # Local environment (do not commit secrets)
 .env
 /node_modules/
+.DS_Store

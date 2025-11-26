@@ -265,7 +265,7 @@ async function runParallel(tasks, concurrency) {
   });
 
   try {
-    await runParallel(wrappedTasks, 4);
+    await runParallel(wrappedTasks, 10);
   } finally {
     await browser.close();
     server.close();
