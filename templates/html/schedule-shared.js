@@ -152,7 +152,7 @@
       const qs = new URLSearchParams(location.search);
       regionId = qs.get('region') || regionId;
     } catch (e) { }
-    const url = `../data/${regionId}.json`;
+    const url = `../../data/${regionId}.json`;
     try {
       const res = await fetch(url);
       return await res.json();

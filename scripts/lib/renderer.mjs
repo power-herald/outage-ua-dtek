@@ -92,10 +92,30 @@ export async function renderPage({
         const hasSummary = await page.$('.summary-card');
 
         if (hasMatrix) {
-            await page.waitForSelector('#matrix tbody tr:last-child td:last-child', { timeout: timeoutMs });
+            const matrixReady = page.waitForSelector(
+              '#matrix tbody tr:last-child td:last-child',
+              { timeout: timeoutMs }
+            );
+
+            const matrixEmpty = page.waitForSelector(
+              '#matrix tbody tr th[colspan]',
+              { timeout: timeoutMs }
+            );
+
+            await Promise.race([matrixReady, matrixEmpty]);
         }
         if (hasToday) {
-            await page.waitForSelector('#today tbody tr td:last-child', { timeout: timeoutMs });
+            const todayReady = page.waitForSelector(
+              '#today tbody tr td:last-child',
+              { timeout: timeoutMs }
+            );
+
+            const todayEmpty = page.waitForSelector(
+              '#today tbody tr th[colspan]',
+              { timeout: timeoutMs }
+            );
+
+          await Promise.race([todayReady, todayEmpty]);
         }
         if (hasSummary) {
             const waitIntervals = page.waitForSelector('.summary-intervals > div', { timeout: timeoutMs }).catch(() => null);
