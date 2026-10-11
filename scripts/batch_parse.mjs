@@ -50,7 +50,7 @@ function runParser({ region, htmlPath, upstream, outPath }) {
   return new Promise((resolve) => {
     const args = [parserScript, '--region', region, '--in', htmlPath, '--out', outPath];
     if (upstream) { args.push('--upstream', upstream); }
-    args.push('--pretty');
+    // args.push('--pretty');
     const child = spawn(process.execPath, args, { stdio: 'inherit' });
     child.on('exit', (code) => resolve({ code: code ?? 0 }));
   });
