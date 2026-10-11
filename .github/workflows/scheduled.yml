@@ -127,83 +127,11 @@ jobs:
             echo "regions=$regions" >> $GITHUB_OUTPUT
           fi
 
-  # Job 2: Render images for each region in parallel
-  render-images:
-    name: Render ${{ matrix.region }}
-    runs-on: ubuntu-latest
-    needs: fetch-and-parse
-    if: needs.fetch-and-parse.outputs.has_changes == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        region: ${{ fromJson(needs.fetch-and-parse.outputs.regions) }}
-    env:
-      TARGET_BRANCH: main
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Ensure Playwright Chromium is installed
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx --yes playwright install --with-deps chromium
-
-      - name: Download JSON data artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: json-data
-          path: data/
-
-      - name: Render images for ${{ matrix.region }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "[INFO] Rendering images for region='${{ matrix.region }}'"
-          node scripts/batch_render.mjs --region "${{ matrix.region }}"
-
-      - name: Compress images with pngquant
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "[INFO] Compressing PNG images for ${{ matrix.region }}..."
-          find images/${{ matrix.region }} -name "*.png" -print0 2>/dev/null | xargs -0 -P 4 -I {} npx pngquant-bin --force --ext .png --quality 65-80 --skip-if-larger "{}" || true
-          echo "[INFO] Compression complete."
-
-      - name: Upload images as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: images-${{ matrix.region }}
-          path: images/${{ matrix.region }}/
-          retention-days: 1
-
-  # Job 3: Publish schedule data and rendered images to a separate repository
+  # Job 3: Publish schedule data to a separate repository
   publish-data:
-    name: Publish schedules and images
+    name: Publish schedules
     runs-on: ubuntu-latest
-    needs: [fetch-and-parse, render-images]
+    needs: [fetch-and-parse]
     if: needs.fetch-and-parse.outputs.has_changes == 'true' && github.ref_name == 'main'
     env:
       DATA_REPOSITORY: ${{ vars.DATA_REPOSITORY }}
@@ -239,42 +167,23 @@ jobs:
           name: json-data
           path: data-files/
 
-      - name: Download all image artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: images-*
-          path: image-artifacts/
-
-      - name: Arrange data and image folders
+      - name: Arrange data folders
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
           json_files=(data-files/*.json)
-          image_artifacts=(image-artifacts/images-*)
           if [ "${#json_files[@]}" -eq 0 ]; then
             echo "No JSON files found in the data artifact." >&2
             exit 1
           fi
-          if [ "${#image_artifacts[@]}" -eq 0 ]; then
-            echo "No image artifacts found." >&2
-            exit 1
-          fi
 
           find data-repository -maxdepth 1 -type f -name '*.json' -delete
-          rm -rf data-repository/data data-repository/images
-          mkdir -p data-repository/data data-repository/images
+          rm -rf data-repository/data
+          mkdir -p data-repository/data
           cp "${json_files[@]}" data-repository/data/
 
-          for artifact_dir in "${image_artifacts[@]}"; do
-            [ -d "$artifact_dir" ] || continue
-            region=${artifact_dir##*/images-}
-            target_dir="data-repository/images/$region"
-            mkdir -p "$target_dir"
-            cp -a "$artifact_dir/." "$target_dir/"
-          done
-
-      - name: Commit and push schedules and images
+      - name: Commit and push schedules
         shell: bash
         run: |
           set -euo pipefail
@@ -284,14 +193,14 @@ jobs:
 
           git add -A
           if git diff --cached --quiet; then
-            echo "[INFO] No schedule or image changes to publish."
+            echo "[INFO] No schedule changes to publish."
             exit 0
           fi
 
-          git commit -m "chore: update schedules and images — run #${GITHUB_RUN_ID}"
+          git commit -m "chore: update schedules — run #${GITHUB_RUN_ID}"
           for attempt in 1 2 3; do
             if git push origin "HEAD:${DATA_BRANCH}"; then
-              echo "[OK] Published schedules and images to ${DATA_REPOSITORY}:${DATA_BRANCH}"
+              echo "[OK] Published schedules to ${DATA_REPOSITORY}:${DATA_BRANCH}"
               exit 0
             fi
             echo "[WARN] Push failed (attempt ${attempt}); rebasing on latest destination branch."
@@ -299,5 +208,5 @@ jobs:
             git rebase "origin/${DATA_BRANCH}"
           done
 
-          echo "[ERROR] Failed to publish schedules and images after retries." >&2
+          echo "[ERROR] Failed to publish schedules after retries." >&2
           exit 1
