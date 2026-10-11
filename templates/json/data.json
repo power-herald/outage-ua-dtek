@@ -4,6 +4,9 @@
   "lastUpdated": null,
   "fact": null,
   "preset": null,
+  "emergency": {
+    "enabled": false
+  },
   "lastUpdateStatus": {
     "status": "idle",
     "ok": true,
@@ -13,7 +16,7 @@
     "attempt": 0
   },
   "meta": {
-    "schemaVersion": "1.0.0",
+    "schemaVersion": "1.1.0",
     "contentHash": null
   }
 }

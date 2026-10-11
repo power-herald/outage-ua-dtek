@@ -16,8 +16,9 @@
   "lastUpdated": "2025-11-06T11:41:56.430Z",
   "fact": { "updateFact": "06.11.2025 09:09" },
   "preset": { "updateFact": "04.11.2025 18:00" },
+  "emergency": { "enabled": false },
   "lastUpdateStatus": { "status": "parsed", "ok": true, "code": 200, "message": null, "at": "2025-11-06T11:41:56.430Z", "attempt": 5 },
-  "meta": { "schemaVersion": "1.0.0", "contentHash": "..." }
+  "meta": { "schemaVersion": "1.1.0", "contentHash": "..." }
 }
 ```
 

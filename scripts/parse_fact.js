@@ -116,9 +116,10 @@ function loadTemplateBase(regionId) {
       lastUpdated: null,
       fact: null,
       preset: null,
+      emergency: { enabled: false },
       lastUpdateStatus: { status: 'idle', ok: true, code: null, message: null, at: null, attempt: 0 },
       meta: {
-        schemaVersion: '1.0.0',
+        schemaVersion: '1.1.0',
         contentHash: null
       }
     };
@@ -143,7 +144,7 @@ function updateStatusOnError(existingObj, regionId, _upstream, code, message) {
   };
   // meta remains minimal per new schema
   if (base.meta && typeof base.meta === 'object') {
-    base.meta.schemaVersion = base.meta.schemaVersion || '1.0.0';
+    base.meta.schemaVersion = base.meta.schemaVersion || '1.1.0';
   }
   return base;
 }
@@ -233,13 +234,29 @@ function extractGroupsWithIso(data) {
   return Object.keys(out).length ? out : null;
 }
 
-function buildOutput(regionId, factObj, presetObj) {
+function extractEmergencyEnabled(html) {
+  const attentionBlocks = html.matchAll(/<div\b(?=[^>]*\bclass\s*=\s*(["'])[^"']*\bm-attention__text\b[^"']*\1)[^>]*>([\s\S]*?)<\/div\s*>/gi);
+  for (const [, , block] of attentionBlocks) {
+    const paragraphs = block.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p\s*>/gi);
+    for (const [, paragraph] of paragraphs) {
+      const strongElements = paragraph.matchAll(/<strong\b[^>]*>([\s\S]*?)<\/strong\s*>/gi);
+      for (const [, strongText] of strongElements) {
+        const text = strongText.replace(/<[^>]*>/g, ' ');
+        if (/(?:екстрені|стабілізаційні|аварійні)/i.test(text)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function buildOutput(regionId, factObj, presetObj, emergency) {
   const now = isoNow();
   return {
     regionId,
     lastUpdated: now,
     fact: factObj,
     preset: presetObj,
+    emergency,
     lastUpdateStatus: {
       status: 'parsed',
       ok: true,
@@ -249,7 +266,7 @@ function buildOutput(regionId, factObj, presetObj) {
       attempt: 1,
     },
     meta: {
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       contentHash: null,
     },
   };
@@ -318,7 +335,8 @@ function main() {
 
   const now = isoNow();
 
-  let outObj = buildOutput(regionId, factParsed.value, presetParsed);
+  const emergency = { enabled: extractEmergencyEnabled(html) };
+  let outObj = buildOutput(regionId, factParsed.value, presetParsed, emergency);
 
   // Merge with existing to increment attempts
   const existing = loadExisting(args.output);
@@ -339,8 +357,8 @@ function main() {
     attempt: prevAttempt + 1,
   };
 
-  // Compute content hash based on the extracted JSON text of fact + preset (if any)
-  const hashInput = factExt.jsonLike + '|' + (presetExt.error ? '' : presetExt.jsonLike);
+  // Include emergency state so toggling the notice changes the content hash.
+  const hashInput = factExt.jsonLike + '|' + (presetExt.error ? '' : presetExt.jsonLike) + '|' + JSON.stringify(emergency);
   const hash = sha256(hashInput);
   outObj.meta.contentHash = hash;
 
