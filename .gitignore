@@ -1,5 +1,6 @@
 /.idea/*
 /outputs/*
+.git-rewrite/
 
 # Local environment (do not commit secrets)
 .env
