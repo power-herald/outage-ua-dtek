@@ -199,123 +199,105 @@ jobs:
           path: images/${{ matrix.region }}/
           retention-days: 1
 
-  # Job 3: Commit all changes (JSON + images) in a single commit
-  commit-all:
-    name: Commit all changes
+  # Job 3: Publish schedule data and rendered images to a separate repository
+  publish-data:
+    name: Publish schedules and images
     runs-on: ubuntu-latest
     needs: [fetch-and-parse, render-images]
     if: needs.fetch-and-parse.outputs.has_changes == 'true' && github.ref_name == 'main'
     env:
-      TARGET_BRANCH: main
+      DATA_REPOSITORY: ${{ vars.DATA_REPOSITORY }}
+      DATA_BRANCH: main
     steps:
-      - name: Checkout repository
+      - name: Validate destination configuration
+        shell: bash
+        env:
+          DATA_REPOSITORY_TOKEN: ${{ secrets.DATA_REPOSITORY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATA_REPOSITORY:-}" ]; then
+            echo "DATA_REPOSITORY variable must be set to owner/repository." >&2
+            exit 1
+          fi
+          if [ -z "${DATA_REPOSITORY_TOKEN:-}" ]; then
+            echo "DATA_REPOSITORY_TOKEN secret must provide write access to the destination repository." >&2
+            exit 1
+          fi
+
+      - name: Checkout data repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          repository: ${{ env.DATA_REPOSITORY }}
+          token: ${{ secrets.DATA_REPOSITORY_TOKEN }}
+          ref: ${{ env.DATA_BRANCH }}
+          path: data-repository
+          fetch-depth: 0
 
       - name: Download JSON data artifact
         uses: actions/download-artifact@v4
         with:
           name: json-data
-          path: data/
+          path: data-files/
 
       - name: Download all image artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: images-*
-          path: images/
+          path: image-artifacts/
 
-      - name: Verify and fix image structure
+      - name: Arrange data and image folders
         shell: bash
         run: |
           set -euo pipefail
-          echo "[INFO] Restructuring image folders..."
-          
-          # Artifacts are downloaded to images/images-{region}/
-          # We need to move the CONTENTS of these folders to images/{region}/
-          
-          for artifact_dir in images/images-*; do
-            if [ -d "$artifact_dir" ]; then
-              # Extract region name: images/images-kyiv -> kyiv
-              region=$(basename "$artifact_dir" | sed 's/^images-//')
-              
-              target_dir="images/$region"
-              echo "[INFO] Processing $region..."
-              echo "[INFO] Source: $artifact_dir"
-              echo "[INFO] Target: $target_dir"
-              
-              # Create target directory
-              mkdir -p "$target_dir"
-              
-              # Move all files from artifact dir to target dir
-              # We use find to avoid errors if dir is empty (though it shouldn't be)
-              # and to handle hidden files if any
-              
-              # Check if there are files to move
-              if [ "$(ls -A $artifact_dir)" ]; then
-                mv "$artifact_dir"/* "$target_dir"/
-                echo "[INFO] Moved files to $target_dir"
-              else
-                echo "[WARN] Artifact directory $artifact_dir is empty"
-              fi
-              
-              # Remove the now empty artifact directory
-              rm -rf "$artifact_dir"
-            fi
-          done
-          
-          echo "[INFO] Final image structure:"
-          ls -la images/ || true
-          
-          echo "[INFO] Verifying region folders:"
-          for region_dir in images/*/; do
-            if [ -d "$region_dir" ]; then
-              echo "--- $region_dir ---"
-              ls -la "$region_dir" | head -5 || true
-            fi
+          shopt -s nullglob
+          json_files=(data-files/*.json)
+          image_artifacts=(image-artifacts/images-*)
+          if [ "${#json_files[@]}" -eq 0 ]; then
+            echo "No JSON files found in the data artifact." >&2
+            exit 1
+          fi
+          if [ "${#image_artifacts[@]}" -eq 0 ]; then
+            echo "No image artifacts found." >&2
+            exit 1
+          fi
+
+          find data-repository -maxdepth 1 -type f -name '*.json' -delete
+          rm -rf data-repository/data data-repository/images
+          mkdir -p data-repository/data data-repository/images
+          cp "${json_files[@]}" data-repository/data/
+
+          for artifact_dir in "${image_artifacts[@]}"; do
+            [ -d "$artifact_dir" ] || continue
+            region=${artifact_dir##*/images-}
+            target_dir="data-repository/images/$region"
+            mkdir -p "$target_dir"
+            cp -a "$artifact_dir/." "$target_dir/"
           done
 
-      - name: Commit and push all changes
+      - name: Commit and push schedules and images
         shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo "[INFO] Preparing to commit all changes (JSON + images) to ${TARGET_BRANCH}"
-
+          cd data-repository
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-          echo "[INFO] Changed files:"
-          git status --porcelain || true
-
-          # Add all JSON and image files
-          git add data/*.json 2>/dev/null || true
-          git add images/** 2>/dev/null || true
-
+          git add -A
           if git diff --cached --quiet; then
-            echo "[INFO] No changes detected — skipping commit"
+            echo "[INFO] No schedule or image changes to publish."
             exit 0
           fi
 
-          echo "[INFO] Staged files:"
-          git diff --name-only --cached
-
-          commit_msg="chore: update schedules and images — run #${GITHUB_RUN_ID}"
-          git commit -m "$commit_msg"
-
-          # Retry push up to 3 times
+          git commit -m "chore: update schedules and images — run #${GITHUB_RUN_ID}"
           for attempt in 1 2 3; do
-            if git push origin HEAD:"$TARGET_BRANCH"; then
-              echo "[OK] Pushed all updates to $TARGET_BRANCH"
+            if git push origin "HEAD:${DATA_BRANCH}"; then
+              echo "[OK] Published schedules and images to ${DATA_REPOSITORY}:${DATA_BRANCH}"
               exit 0
             fi
-            echo "[WARN] Push failed (attempt $attempt). Fetching and rebasing..."
-            git fetch origin "$TARGET_BRANCH" --depth=1
-            git rebase "origin/$TARGET_BRANCH" || true
-            sleep $((attempt*2))
+            echo "[WARN] Push failed (attempt ${attempt}); rebasing on latest destination branch."
+            git fetch origin "${DATA_BRANCH}"
+            git rebase "origin/${DATA_BRANCH}"
           done
 
-          echo "[ERROR] Failed to push changes after retries" >&2
+          echo "[ERROR] Failed to publish schedules and images after retries." >&2
           exit 1
