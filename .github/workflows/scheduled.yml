@@ -19,7 +19,7 @@ jobs:
   # Job 1: Fetch and parse HTML for all regions
   fetch-and-parse:
     name: Fetch and parse HTML
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       regions: ${{ steps.set-matrix.outputs.regions }}
       has_changes: ${{ steps.check-changes.outputs.has_changes }}
