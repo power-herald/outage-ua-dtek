@@ -116,7 +116,8 @@ function loadTemplateBase(regionId) {
       lastUpdated: null,
       fact: null,
       preset: null,
-      emergency: { enabled: false },
+      emergency: { enabled: false, enabled_districts: null },
+      stabilizing: { enabled: false },
       lastUpdateStatus: { status: 'idle', ok: true, code: null, message: null, at: null, attempt: 0 },
       meta: {
         schemaVersion: '1.1.0',
@@ -249,7 +250,24 @@ function extractEmergencyEnabled(html) {
   return false;
 }
 
-function buildOutput(regionId, factObj, presetObj, emergency) {
+function extractEmergencyDistricts(html) {
+  const attentionBlocks = html.matchAll(/<div\b(?=[^>]*\bclass\s*=\s*(["'])[^"']*\bm-attention__text\b[^"']*\1)[^>]*>([\s\S]*?)<\/div\s*>/gi);
+  for (const [, , block] of attentionBlocks) {
+    const match = block.match(/<strong\b[^>]*>\s*аварійне відключення\s*<\/strong\s*>([^<]+)/i);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function extractStabilizingEnabled(html) {
+  const attentionBlocks = html.matchAll(/<div\b(?=[^>]*\bclass\s*=\s*(["'])[^"']*\bm-attention__text\b[^"']*\1)[^>]*>([\s\S]*?)<\/div\s*>/gi);
+  for (const [, , block] of attentionBlocks) {
+    if (/стабілізаційні/i.test(block.replace(/<[^>]*>/g, ' '))) return true;
+  }
+  return false;
+}
+
+function buildOutput(regionId, factObj, presetObj, emergency, stabilizing) {
   const now = isoNow();
   return {
     regionId,
@@ -257,6 +275,7 @@ function buildOutput(regionId, factObj, presetObj, emergency) {
     fact: factObj,
     preset: presetObj,
     emergency,
+    stabilizing,
     lastUpdateStatus: {
       status: 'parsed',
       ok: true,
@@ -335,8 +354,9 @@ function main() {
 
   const now = isoNow();
 
-  const emergency = { enabled: extractEmergencyEnabled(html) };
-  let outObj = buildOutput(regionId, factParsed.value, presetParsed, emergency);
+  const emergency = { enabled: extractEmergencyEnabled(html), enabled_districts: extractEmergencyDistricts(html) };
+  const stabilizing = { enabled: extractStabilizingEnabled(html) };
+  let outObj = buildOutput(regionId, factParsed.value, presetParsed, emergency, stabilizing);
 
   // Merge with existing to increment attempts
   const existing = loadExisting(args.output);
@@ -357,8 +377,8 @@ function main() {
     attempt: prevAttempt + 1,
   };
 
-  // Include emergency state so toggling the notice changes the content hash.
-  const hashInput = factExt.jsonLike + '|' + (presetExt.error ? '' : presetExt.jsonLike) + '|' + JSON.stringify(emergency);
+  // Include notice states so toggling them changes the content hash.
+  const hashInput = factExt.jsonLike + '|' + (presetExt.error ? '' : presetExt.jsonLike) + '|' + JSON.stringify(emergency) + '|' + JSON.stringify(stabilizing);
   const hash = sha256(hashInput);
   outObj.meta.contentHash = hash;
 

@@ -5,6 +5,10 @@
   "fact": null,
   "preset": null,
   "emergency": {
+    "enabled": false,
+    "enabled_districts": null
+  },
+  "stabilizing": {
     "enabled": false
   },
   "lastUpdateStatus": {

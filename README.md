@@ -16,7 +16,8 @@
   "lastUpdated": "2025-11-06T11:41:56.430Z",
   "fact": { "updateFact": "06.11.2025 09:09" },
   "preset": { "updateFact": "04.11.2025 18:00" },
-  "emergency": { "enabled": false },
+  "emergency": { "enabled": false, "enabled_districts": null },
+  "stabilizing": { "enabled": false },
   "lastUpdateStatus": { "status": "parsed", "ok": true, "code": 200, "message": null, "at": "2025-11-06T11:41:56.430Z", "attempt": 5 },
   "meta": { "schemaVersion": "1.1.0", "contentHash": "..." }
 }
@@ -24,8 +25,10 @@
 
 - `preset` — планові відключення на тиждень для кожної групи (тижневий шаблон). Зберігається «як є», без нормалізації структури.
 - `fact` — фактичні/аварійні відключення на сьогодні та завтра для кожної групи. Також зберігається «як є».
+- `emergency.enabled` — ознака загальних аварійних відключень; `emergency.enabled_districts` — незмінений перелік районів де введені аварійні відключення, або `null`, якщо вони не зазначені. Ці поля визначаються незалежно.
+- `stabilizing.enabled` — `true`, якщо введені «стабілізаційні» відключення (графік відключень формується «на затра»).
 - Кожен із об’єктів (`fact` і `preset`) містить поле `updateFact` та `update` — дата й час, на які інформація актуальна (значення з джерела; парсер не змінює формат, зазвичай `dd.MM.yyyy HH:mm` у часовій зоні Europe/Kyiv).
-- Блок `meta` мінімальний: тільки `schemaVersion` та `contentHash` (хеш вмісту `fact` + `preset`).
+- Блок `meta` мінімальний: тільки `schemaVersion` та `contentHash` (хеш вмісту `fact`, `preset` і станів `emergency` та `stabilizing`).
 - У разі помилки парсингу парсер оновлює лише `lastUpdateStatus` (наприклад, `status = "error"`, код 422), не стираючи попередні `fact`/`preset`.
 - Актуальний шаблон структури — у файлі `templates/json/data.json`.
 
