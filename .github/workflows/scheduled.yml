@@ -10,6 +10,10 @@ on:
         description: 'Optional: process only this region id (must match a key in REGION_SOURCES_JSON)'
         required: false
         type: string
+      gpv:
+        description: 'Optional: keep only this GPV group in output data (e.g. GPV1.2)'
+        required: false
+        type: string
 
 jobs:
   # Job 1: Fetch and parse HTML for all regions
@@ -22,6 +26,7 @@ jobs:
     env:
       REGION_SOURCES_JSON: ${{ secrets.REGION_SOURCES_JSON }}
       REGION: ${{ github.event.inputs.region }}
+      GPV: ${{ github.event.inputs.gpv }}
       TARGET_BRANCH: main
     steps:
       - name: Checkout repository
@@ -87,6 +92,10 @@ jobs:
           set -euo pipefail
           echo "[INFO] Parsing outputs/*.html into data/*.json via Node batch parser"
           node scripts/batch_parse.mjs
+
+      - name: Filter output data by GPV
+        if: env.GPV != ''
+        run: node scripts/filter_gpv.mjs
 
       - name: Check for data changes
         id: check-changes

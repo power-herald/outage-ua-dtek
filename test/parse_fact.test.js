@@ -70,3 +70,35 @@ test('extracts district emergency text without changing general emergency detect
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('filters GPV groups from all output files while preserving other data', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'outage-gpv-test-'));
+  const script = path.join(__dirname, '..', 'scripts', 'filter_gpv.mjs');
+  const original = {
+    fact: { data: { today: { 'GPV1.1': { 1: 'yes' }, 'GPV1.2': { 1: 'no' } } }, update: 'today' },
+    preset: { data: { 'GPV1.1': [1], 'GPV1.2': [2] }, update: 'week' },
+    emergency: { enabled: false },
+    stabilizing: { enabled: false },
+    meta: { contentHash: 'original' },
+  };
+  const files = ['first.json', 'second.json'].map(name => path.join(directory, name));
+  const run = (gpv) => execFileSync(process.execPath, [script, directory], { env: { ...process.env, GPV: gpv } });
+
+  try {
+    for (const file of files) fs.writeFileSync(file, JSON.stringify(original));
+    run('');
+    assert.deepEqual(JSON.parse(fs.readFileSync(files[0], 'utf8')), original);
+    run('gpv1.2');
+    for (const file of files) {
+      const result = JSON.parse(fs.readFileSync(file, 'utf8'));
+      assert.deepEqual(result.fact.data.today, { 'GPV1.2': { 1: 'no' } });
+      assert.deepEqual(result.preset.data, { 'GPV1.2': [2] });
+      assert.equal(result.fact.update, 'today');
+      assert.equal(result.preset.update, 'week');
+      assert.notEqual(result.meta.contentHash, 'original');
+    }
+    assert.throws(() => run('invalid'));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
