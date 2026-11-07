@@ -11,7 +11,7 @@ on:
         required: false
         type: string
       gpv:
-        description: 'Optional: keep only this GPV group in output data (e.g. GPV1.2)'
+        description: 'Optional: keep only this GPV group in the selected region (e.g. GPV1.2)'
         required: false
         type: string
 
@@ -26,7 +26,7 @@ jobs:
     env:
       REGION_SOURCES_JSON: ${{ secrets.REGION_SOURCES_JSON }}
       REGION: ${{ github.event.inputs.region }}
-      GPV: ${{ github.event.inputs.gpv }}
+      GPV: ${{ github.event.inputs.gpv || vars.GPV }}
       TARGET_BRANCH: main
     steps:
       - name: Checkout repository
@@ -94,7 +94,7 @@ jobs:
           node scripts/batch_parse.mjs
 
       - name: Filter output data by GPV
-        if: env.GPV != ''
+        if: env.GPV != '' && env.REGION != ''
         run: node scripts/filter_gpv.mjs
 
       - name: Check for data changes

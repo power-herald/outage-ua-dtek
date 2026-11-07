@@ -71,7 +71,7 @@ test('extracts district emergency text without changing general emergency detect
   }
 });
 
-test('filters GPV groups from all output files while preserving other data', () => {
+test('filters GPV groups only for the selected region', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'outage-gpv-test-'));
   const script = path.join(__dirname, '..', 'scripts', 'filter_gpv.mjs');
   const original = {
@@ -82,22 +82,23 @@ test('filters GPV groups from all output files while preserving other data', () 
     meta: { contentHash: 'original' },
   };
   const files = ['first.json', 'second.json'].map(name => path.join(directory, name));
-  const run = (gpv) => execFileSync(process.execPath, [script, directory], { env: { ...process.env, GPV: gpv } });
+  const run = (gpv, region) => execFileSync(process.execPath, [script, directory], { env: { ...process.env, GPV: gpv, REGION: region } });
 
   try {
     for (const file of files) fs.writeFileSync(file, JSON.stringify(original));
-    run('');
+    run('', 'first');
     assert.deepEqual(JSON.parse(fs.readFileSync(files[0], 'utf8')), original);
-    run('gpv1.2');
-    for (const file of files) {
-      const result = JSON.parse(fs.readFileSync(file, 'utf8'));
-      assert.deepEqual(result.fact.data.today, { 'GPV1.2': { 1: 'no' } });
-      assert.deepEqual(result.preset.data, { 'GPV1.2': [2] });
-      assert.equal(result.fact.update, 'today');
-      assert.equal(result.preset.update, 'week');
-      assert.notEqual(result.meta.contentHash, 'original');
-    }
-    assert.throws(() => run('invalid'));
+    run('gpv1.2', '');
+    assert.deepEqual(JSON.parse(fs.readFileSync(files[0], 'utf8')), original);
+    run('gpv1.2', 'first');
+    const result = JSON.parse(fs.readFileSync(files[0], 'utf8'));
+    assert.deepEqual(result.fact.data.today, { 'GPV1.2': { 1: 'no' } });
+    assert.deepEqual(result.preset.data, { 'GPV1.2': [2] });
+    assert.equal(result.fact.update, 'today');
+    assert.equal(result.preset.update, 'week');
+    assert.notEqual(result.meta.contentHash, 'original');
+    assert.deepEqual(JSON.parse(fs.readFileSync(files[1], 'utf8')), original);
+    assert.throws(() => run('invalid', 'first'));
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
