@@ -243,7 +243,7 @@ function extractEmergencyEnabled(html) {
       const strongElements = paragraph.matchAll(/<strong\b[^>]*>([\s\S]*?)<\/strong\s*>/gi);
       for (const [, strongText] of strongElements) {
         const text = strongText.replace(/<[^>]*>/g, ' ');
-        if (/(?:екстрені|стабілізаційні|аварійні)/i.test(text)) return true;
+        if (/(?:екстрені|аварійні)/i.test(text)) return true;
       }
     }
   }
