@@ -1,9 +1,6 @@
 name: Scheduled Pipeline
 
-on:
-  schedule:
-    - cron: '3,18,33,48 * * * *'
-    
+on: 
   # Allows manual trigger from the Actions tab and GitHub API
   workflow_dispatch:
     inputs:
