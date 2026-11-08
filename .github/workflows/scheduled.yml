@@ -1,6 +1,4 @@
 name: Scheduled Pipeline
-permissions:
-  contents: write
 
 on:
   schedule:
