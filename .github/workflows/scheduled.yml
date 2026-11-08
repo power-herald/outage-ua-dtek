@@ -25,7 +25,7 @@ jobs:
       has_changes: ${{ steps.check-changes.outputs.has_changes }}
     env:
       REGION_SOURCES_JSON: ${{ secrets.REGION_SOURCES_JSON }}
-      REGION: ${{ github.event.inputs.region }}
+      REGION: ${{ github.event.inputs.region || vars.REGION }}
       GPV: ${{ github.event.inputs.gpv || vars.GPV }}
       TARGET_BRANCH: main
     steps:
